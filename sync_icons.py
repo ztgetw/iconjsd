@@ -4,36 +4,33 @@ import requests
 from urllib.parse import urlparse
 
 # ================= 配置 =================
-# 目标源 JSON（Vercel 源）
+# 目标源 JSON
 SOURCE_URL = "https://emby-icon.vercel.app/TFEL-Emby.json"
 # 保存的 JSON 文件名
 OUTPUT_JSON_NAME = "TFEL-Emby-Mirror.json"
 # 图片保存目录
 ICONS_DIR = "icons"
-# 目标分支名称 (存放图片和JSON的分支)
-TARGET_BRANCH = "cdn"
+# 目标分支名称 (已修改为 icon)
+TARGET_BRANCH = "icon"
 # =======================================
 
 def run():
-    # 1. 获取当前仓库信息
     repo_full_name = os.environ.get("GITHUB_REPOSITORY")
     if not repo_full_name:
         print("错误：无法获取 GITHUB_REPOSITORY 环境变量")
         return
 
-    # 构造 Base URL，注意这里强制使用了 TARGET_BRANCH (cdn)
-    # 最终格式: https://ghproxy.net/https://raw.githubusercontent.com/用户/仓库/cdn/icons/
+    # 构造 Base URL，指向 icon 分支
+    # 最终格式: https://ghproxy.net/https://raw.githubusercontent.com/用户/仓库/icon/icons/
     base_url = f"https://ghproxy.net/https://raw.githubusercontent.com/{repo_full_name}/{TARGET_BRANCH}/{ICONS_DIR}/"
     
     print(f"当前仓库: {repo_full_name}")
     print(f"目标分支: {TARGET_BRANCH}")
     print(f"图片基准路径: {base_url}")
 
-    # 2. 创建目录
     if not os.path.exists(ICONS_DIR):
         os.makedirs(ICONS_DIR)
 
-    # 3. 下载原始 JSON
     print("正在下载原始 JSON...")
     try:
         resp = requests.get(SOURCE_URL, timeout=30)
@@ -43,7 +40,6 @@ def run():
         print(f"下载 JSON 失败: {e}")
         return
 
-    # 4. 遍历并处理
     items = data if isinstance(data, list) else data.get("icons", [])
     print(f"找到 {len(items)} 个图标，开始同步...")
 
@@ -56,7 +52,6 @@ def run():
         filename = os.path.basename(parsed.path)
         if not filename: continue
 
-        # A. 下载图片
         save_path = os.path.join(ICONS_DIR, filename)
         if not os.path.exists(save_path):
             try:
@@ -69,15 +64,17 @@ def run():
             except Exception as e:
                 print(f"[ERR] 下载异常 {filename}: {e}")
         
-        # B. 修改链接指向 cdn 分支
+        # 修改链接指向 icon 分支
         new_link = base_url + filename
         if 'url' in item: item['url'] = new_link
         if 'Url' in item: item['Url'] = new_link
         
         count += 1
 
-    # 5. 保存 JSON
     with open(OUTPUT_JSON_NAME, "w", encoding="utf-8") as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-    print(f
+    print(f"处理完成！JSON 已生成，准备推送到 {TARGET_BRANCH} 分支。")
+
+if __name__ == "__main__":
+    run()
